@@ -1,0 +1,19 @@
+sizes:
+  - name: "crop"
+    width: 800
+    height: 200
+    quality: 80
+    mode: "crop"
+    anchor: "center"
+  - name: "fill"
+    width: 800
+    height: 200
+    quality: 80
+    mode: "fill"
+    anchor: "center"
+  - name: "fit"
+    width: 800
+    height: 200
+    quality: 80
+    mode: "fit"
+    anchor: "center"
