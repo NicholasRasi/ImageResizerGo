@@ -11,6 +11,7 @@ import (
 	"github.com/disintegration/imaging"
 	"gopkg.in/yaml.v2"
 	"time"
+	"sync"
 )
 
 const (
@@ -31,15 +32,19 @@ var anchorMap = map[string]imaging.Anchor{
 	"bottomRight": imaging.BottomRight,
 }
 
+var wg sync.WaitGroup
+
 type Conf struct {
-	Sizes []struct {
-		Name string `yaml:"name"`
-		Width int `yaml:"width"`
-		Height int `yaml:"height"`
-		Quality int `yaml:"quality"`
-		Mode string `yaml:"mode"`
-		Anchor string `yaml:"anchor"`
-	} `yaml:"sizes"`
+	Sizes []Size `yaml:"sizes"`
+}
+
+type Size struct {
+	Name string `yaml:"name"`
+	Width int `yaml:"width"`
+	Height int `yaml:"height"`
+	Quality int `yaml:"quality"`
+	Mode string `yaml:"mode"`
+	Anchor string `yaml:"anchor"`
 }
 
 func getConf() (*Conf, error) {
@@ -97,6 +102,30 @@ func timeTrack(start time.Time, name string) {
     log.Printf("%s took %s", name, elapsed)
 }
 
+func processImage(size Size, file string) {
+	defer wg.Done()
+
+	src, err := imaging.Open(InDir+"/"+file)
+	if err != nil {
+		log.Fatalf("Failed to open image: %v", err)
+	}
+
+	var dst *image.NRGBA
+	switch size.Mode {
+	case "crop":
+		dst = imaging.CropAnchor(src, size.Width, size.Height, anchorMap[size.Anchor])
+	case "fill":
+		dst = imaging.Fill(src, size.Width, size.Height, anchorMap[size.Anchor], imaging.Lanczos)
+	case "fit":
+		dst = imaging.Fit(src, size.Width, size.Height, imaging.Lanczos)
+	}
+	
+	err = imaging.Save(dst, OutDir+"/"+size.Name+"_"+file, imaging.JPEGQuality(size.Quality))
+	if err != nil {
+		log.Fatalf("Failed to save image: %v", err)
+	}
+}
+
 func main() {
 	log.Println("Check if input dir exists...")
 	if !checkDirectoryIfExists(InDir) {
@@ -125,25 +154,10 @@ func main() {
 
 		for _, file := range files {
 			log.Println("Working with file", InDir+"/"+file)
-			src, err := imaging.Open(InDir+"/"+file)
-			if err != nil {
-				log.Fatalf("Failed to open image: %v", err)
-			}
-
-			var dst *image.NRGBA
-			switch size.Mode {
-			case "crop":
-				dst = imaging.CropAnchor(src, size.Width, size.Height, anchorMap[size.Anchor])
-			case "fill":
-				dst = imaging.Fill(src, size.Width, size.Height, anchorMap[size.Anchor], imaging.Lanczos)
-			case "fit":
-				dst = imaging.Fit(src, size.Width, size.Height, imaging.Lanczos)
-			}
-			
-			err = imaging.Save(dst, OutDir+"/"+size.Name+"_"+file, imaging.JPEGQuality(size.Quality))
-			if err != nil {
-				log.Fatalf("Failed to save image: %v", err)
-			}
+			wg.Add(1)
+			go processImage(size, file)
 		}
 	}
+
+	wg.Wait()
 }

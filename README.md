@@ -6,5 +6,6 @@ It is based on the popular [Imaging](https://github.com/disintegration/imaging) 
 ### Goals
 - very easy to use
 - multi-platform
-- configurable resize parameters (r.g. width, height, resize mode, anchor)
+- configurable resize parameters (e.g. width, height, resize mode, anchor)
 - no installation required
+- concurrent processing
