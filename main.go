@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"github.com/disintegration/imaging"
 	"gopkg.in/yaml.v2"
+	"time"
 )
 
 const (
@@ -91,6 +92,11 @@ func readFileFromDir() []string {
 	return files
 }
 
+func timeTrack(start time.Time, name string) {
+    elapsed := time.Since(start)
+    log.Printf("%s took %s", name, elapsed)
+}
+
 func main() {
 	log.Println("Check if input dir exists...")
 	if !checkDirectoryIfExists(InDir) {
@@ -111,8 +117,9 @@ func main() {
 
 	log.Printf("Reading file inside %v dir...", InDir)
 	files := readFileFromDir()
-	log.Printf("found %v files", len(files))
+	log.Printf("Found %v files", len(files))
 
+	defer timeTrack(time.Now(), "processing")
 	for i, size := range conf.Sizes {
 		log.Printf("Generating size %v, size name: %v...", i, size.Name)
 
@@ -120,7 +127,7 @@ func main() {
 			log.Println("Working with file", InDir+"/"+file)
 			src, err := imaging.Open(InDir+"/"+file)
 			if err != nil {
-				log.Fatalf("failed to open image: %v", err)
+				log.Fatalf("Failed to open image: %v", err)
 			}
 
 			var dst *image.NRGBA
@@ -133,9 +140,9 @@ func main() {
 				dst = imaging.Fit(src, size.Width, size.Height, imaging.Lanczos)
 			}
 			
-			err = imaging.Save(dst, OutDir+"/"+size.Name+"_"+file, imaging.JPEGQuality(80))
+			err = imaging.Save(dst, OutDir+"/"+size.Name+"_"+file, imaging.JPEGQuality(size.Quality))
 			if err != nil {
-				log.Fatalf("failed to save image: %v", err)
+				log.Fatalf("Failed to save image: %v", err)
 			}
 		}
 	}
