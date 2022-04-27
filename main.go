@@ -35,10 +35,10 @@ var anchorMap = map[string]imaging.Anchor{
 var wg sync.WaitGroup
 
 type Conf struct {
-	Sizes []Size `yaml:"sizes"`
+	Presets []Preset `yaml:"presets"`
 }
 
-type Size struct {
+type Preset struct {
 	Name string `yaml:"name"`
 	Width int `yaml:"width"`
 	Height int `yaml:"height"`
@@ -102,7 +102,7 @@ func timeTrack(start time.Time, name string) {
     log.Printf("%s took %s", name, elapsed)
 }
 
-func processImage(size Size, file string) {
+func processImage(Preset Preset, file string) {
 	defer wg.Done()
 
 	src, err := imaging.Open(InDir+"/"+file)
@@ -111,16 +111,16 @@ func processImage(size Size, file string) {
 	}
 
 	var dst *image.NRGBA
-	switch size.Mode {
+	switch Preset.Mode {
 	case "crop":
-		dst = imaging.CropAnchor(src, size.Width, size.Height, anchorMap[size.Anchor])
+		dst = imaging.CropAnchor(src, Preset.Width, Preset.Height, anchorMap[Preset.Anchor])
 	case "fill":
-		dst = imaging.Fill(src, size.Width, size.Height, anchorMap[size.Anchor], imaging.Lanczos)
+		dst = imaging.Fill(src, Preset.Width, Preset.Height, anchorMap[Preset.Anchor], imaging.Lanczos)
 	case "fit":
-		dst = imaging.Fit(src, size.Width, size.Height, imaging.Lanczos)
+		dst = imaging.Fit(src, Preset.Width, Preset.Height, imaging.Lanczos)
 	}
 	
-	err = imaging.Save(dst, OutDir+"/"+size.Name+"_"+file, imaging.JPEGQuality(size.Quality))
+	err = imaging.Save(dst, OutDir+"/"+Preset.Name+"_"+file, imaging.JPEGQuality(Preset.Quality))
 	if err != nil {
 		log.Fatalf("Failed to save image: %v", err)
 	}
@@ -149,13 +149,13 @@ func main() {
 	log.Printf("Found %v files", len(files))
 
 	defer timeTrack(time.Now(), "processing")
-	for i, size := range conf.Sizes {
-		log.Printf("Generating size %v, size name: %v...", i, size.Name)
+	for i, Preset := range conf.Presets {
+		log.Printf("Generating Preset %v, Preset name: %v...", i, Preset.Name)
 
 		for _, file := range files {
 			log.Println("Working with file", InDir+"/"+file)
 			wg.Add(1)
-			go processImage(size, file)
+			go processImage(Preset, file)
 		}
 	}
 
