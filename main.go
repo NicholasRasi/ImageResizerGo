@@ -16,8 +16,6 @@ import (
 
 const (
 	ConfFile = "conf.yaml"
-	OutDir = "out"
-	InDir = "in"
 )
 
 var anchorMap = map[string]imaging.Anchor{
@@ -35,7 +33,13 @@ var anchorMap = map[string]imaging.Anchor{
 var wg sync.WaitGroup
 
 type Conf struct {
+	Dirs Dir
 	Presets []Preset `yaml:"presets"`
+}
+
+type Dir struct {
+	In string `yaml:"in"`
+	Out string `yaml:"out"`
 }
 
 type Preset struct {
@@ -82,10 +86,10 @@ func isImage(ext string) bool {
 	strings.ToLower(ext) == ".png")
 }
 
-func readFileFromDir() []string {
+func readFileFromDir(indir string) []string {
 	var files []string
 
-    err := filepath.Walk(InDir, func(path string, info os.FileInfo, err error) error {
+    err := filepath.Walk(indir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() && isImage(filepath.Ext(path)) {
         	files = append(files, info.Name())
 		}
@@ -102,10 +106,10 @@ func timeTrack(start time.Time, name string) {
     log.Printf("%s took %s", name, elapsed)
 }
 
-func processImage(Preset Preset, file string) {
+func processImage(Preset Preset, indir string, outdir string, file string) {
 	defer wg.Done()
 
-	src, err := imaging.Open(InDir+"/"+file)
+	src, err := imaging.Open(indir+"/"+file)
 	if err != nil {
 		log.Fatalf("Failed to open image: %v", err)
 	}
@@ -120,19 +124,13 @@ func processImage(Preset Preset, file string) {
 		dst = imaging.Fit(src, Preset.Width, Preset.Height, imaging.Lanczos)
 	}
 	
-	err = imaging.Save(dst, OutDir+"/"+Preset.Name+"_"+file, imaging.JPEGQuality(Preset.Quality))
+	err = imaging.Save(dst, outdir+"/"+Preset.Name+"_"+file, imaging.JPEGQuality(Preset.Quality))
 	if err != nil {
 		log.Fatalf("Failed to save image: %v", err)
 	}
 }
 
 func main() {
-	log.Println("Check if input dir exists...")
-	if !checkDirectoryIfExists(InDir) {
-		makeDirectoryIfNotExists(InDir)
-		log.Fatalln("Input directory does not exist, making one for you")
-	}
-
 	log.Println("Reading configuration file...")
 	
 	conf, err := getConf()
@@ -140,22 +138,27 @@ func main() {
 		log.Fatal(err)
 	}
 
+	log.Println("Check if input dir exists...")
+	if !checkDirectoryIfExists(conf.Dirs.In) {
+		makeDirectoryIfNotExists(conf.Dirs.In)
+		log.Fatalln("Input directory does not exist, making one for you")
+	}
+
 	log.Println("Making output dir...")
-	makeDirectoryIfNotExists(OutDir)
+	makeDirectoryIfNotExists(conf.Dirs.Out)
 
-
-	log.Printf("Reading file inside %v dir...", InDir)
-	files := readFileFromDir()
+	log.Printf("Reading file inside %v dir...", conf.Dirs.In)
+	files := readFileFromDir(conf.Dirs.In)
 	log.Printf("Found %v files", len(files))
 
 	defer timeTrack(time.Now(), "processing")
-	for i, Preset := range conf.Presets {
-		log.Printf("Generating Preset %v, Preset name: %v...", i, Preset.Name)
+	for i, preset := range conf.Presets {
+		log.Printf("Generating Preset %v, Preset name: %v...", i, preset.Name)
 
 		for _, file := range files {
-			log.Println("Working with file", InDir+"/"+file)
+			log.Println("Working with file", conf.Dirs.In+"/"+file)
 			wg.Add(1)
-			go processImage(Preset, file)
+			go processImage(preset, conf.Dirs.In, conf.Dirs.Out, file)
 		}
 	}
 
